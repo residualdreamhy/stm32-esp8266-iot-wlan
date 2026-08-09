@@ -138,9 +138,6 @@ STM32F103C8 引脚分配
 ├── server/
 │   ├── app.py              # Python 标准库 HTTP 服务器（零依赖）
 │   └── index.html          # Chart.js 双轴温湿度看板
-├── docs/
-│   ├── STM32-ESP8266-温湿度物联网项目笔记.md
-│   └── ESP8266开发踩坑笔记.md
 ├── Library/                # StdPeriph 标准外设库
 ├── Start/                  # 启动文件 + CMSIS
 ├── Project.uvprojx         # Keil 工程文件
@@ -262,8 +259,6 @@ python app.py
 ## 技术文档
 
 - [WLAN 调试指南](WLAN调试指南.md) — 接线、工程配置、编译下载、排障全流程
-- [项目笔记](docs/STM32-ESP8266-温湿度物联网项目笔记.md) — 硬件清单、引脚分配、软件架构、API 文档
-- [ESP8266 踩坑笔记](docs/ESP8266开发踩坑笔记.md) — 14 个实战踩坑记录与解决方案
 
 ## 技术栈
 

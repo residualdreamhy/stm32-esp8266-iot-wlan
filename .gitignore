@@ -33,6 +33,9 @@ venv/
 # Runtime data
 server/data.csv
 
+# Docs (not uploaded to GitHub)
+docs/
+
 # AI tool internal
 .workbuddy/
 
