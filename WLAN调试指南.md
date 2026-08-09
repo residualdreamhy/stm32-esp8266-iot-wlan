@@ -162,7 +162,7 @@ CLOSED                            // 连接正常关闭
 - `delay.c` 新增 `Delay_us()`（基于 DWT 周期计数器），供 DHT11 微秒时序使用。
 
 ### 9.3 main.c 联动逻辑
-启动 → LED 闪烁 → 初始化串口/ESP8266/DHT11/OLED → 连 WiFi（默认 `TP-LINK_64BD`，密码在 main.c 第 63 行）→ **打印模块 IP** → **每 5 秒**：读 DHT11 → OLED 显示 `TEMP:xx C` / `HUMI:xx %` → 上传前**先确认 WiFi 仍连着（掉了就自动重连）** → `ESP8266_HttpPost("httpbin.org","/post",...)` 上传 `{"t":..,"h":..}` → 调试串口打印结果并回显服务器响应。
+启动 → LED 闪烁 → 初始化串口/ESP8266/DHT11/OLED → 连 WiFi（SSID/密码在 main.c 中配置）→ **打印模块 IP** → **每 5 秒**：读 DHT11 → OLED 显示 `TEMP:xx C` / `HUMI:xx %` → 上传前**先确认 WiFi 仍连着（掉了就自动重连）** → `ESP8266_HttpPost(SERVER_IP,SERVER_PATH,...)` 上传 `{"t":..,"h":..}` → 调试串口打印结果并回显服务器响应。
 
 ### 9.4 常见问题
 - **OLED 不亮**：检查 PB8/PB9 接线、I2C 地址 0x78；若模块无板上拉，需在 SCL/SDA 各加 4.7k 上拉到 3.3V；确认 OLED 是 3.3V 版本。

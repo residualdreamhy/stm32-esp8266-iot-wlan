@@ -12,7 +12,7 @@
    命令行执行 ipconfig，看“IPv4 地址”（如 192.168.1.x）。
    模块是另一台设备，不能用 localhost / 127.0.0.1。
    服务器在工程目录的 server/ 下，命令行运行：python app.py */
-#define SERVER_IP   "192.168.0.105"   // 你电脑的局域网 IP
+#define SERVER_IP   "YOUR_LOCAL_IP"   // 改成你电脑的局域网 IP（ipconfig 查看）
 #define SERVER_PORT "8000"
 #define SERVER_PATH "/api/data"
 
@@ -74,7 +74,7 @@ int main(void)
     for (uint8_t i = 0; i < 2 && !wifi_ok; i++)
     {
         if (i > 0) { printf("[INFO] retry WiFi...\r\n"); Delay_ms(1500); }
-        if (ESP8266_JoinAP("TP-LINK_64BD", "88888888") == ESP8266_OK)
+        if (ESP8266_JoinAP("YOUR_SSID", "YOUR_PASSWORD") == ESP8266_OK)
             wifi_ok = 1;
         else if (ESP8266_IsConnected() == 0)   // 指令超时，模块却已连上
             wifi_ok = 1;
@@ -116,7 +116,7 @@ int main(void)
             if (ESP8266_IsConnected() != 0)
             {
                 printf("[INFO] WiFi lost, reconnecting...\r\n");
-                ESP8266_JoinAP("TP-LINK_64BD", "88888888");
+                ESP8266_JoinAP("YOUR_SSID", "YOUR_PASSWORD");
             }
 
             /* 上传带一次重试：失败后先关闭可能半开的 socket 再试，

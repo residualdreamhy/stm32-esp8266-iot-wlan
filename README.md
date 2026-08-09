@@ -151,9 +151,9 @@ STM32F103C8 引脚分配
 
 | 配置项 | 值 | 位置 |
 |---|---|---|
-| WiFi SSID | `TP-LINK_64BD` | main.c |
-| WiFi 密码 | `88888888` | main.c |
-| 服务器 IP | `192.168.0.105` | main.c `#define SERVER_IP` |
+| WiFi SSID | `YOUR_SSID` | main.c |
+| WiFi 密码 | `YOUR_PASSWORD` | main.c |
+| 服务器 IP | `YOUR_LOCAL_IP` | main.c `#define SERVER_IP` |
 | 服务器端口 | `8000` | main.c `#define SERVER_PORT` |
 | 服务器路径 | `/api/data` | main.c `#define SERVER_PATH` |
 | 上传间隔 | 5 秒 | main.c `Delay_ms(5000)` |
@@ -186,7 +186,7 @@ AT+CWJAP="SSID","PASSWORD"    # 连 WiFi（最慢 20 秒）
                  → WIFI CONNECTED / WIFI GOT IP / OK
 
 # 每次上传：
-AT+CIPSTART="TCP","192.168.0.105","8000"  → CONNECT / OK
+AT+CIPSTART="TCP","YOUR_LOCAL_IP","8000"  → CONNECT / OK
 AT+CIPSEND=128                            → >
 <HTTP POST 报文>                           → SEND OK
 AT+CIPCLOSE                               → CLOSED
