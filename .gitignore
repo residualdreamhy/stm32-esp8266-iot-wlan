@@ -1,0 +1,41 @@
+# Keil MDK build artifacts
+Objects/
+Listings/
+DebugConfig/
+*.o
+*.d
+*.crf
+*.axf
+*.htm
+*.lnp
+*.sct
+*.dep
+*.build_log.htm
+*.map
+*.lst
+
+# Keil user-specific files
+*.uvguix.*
+*.uvoptx
+*.scvd
+
+# IDE temp files
+*.bak
+*.tmp
+~*
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Runtime data
+server/data.csv
+
+# AI tool internal
+.workbuddy/
+
+# OS files
+Thumbs.db
+.DS_Store

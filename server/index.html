@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>温湿度实时看板</title>
+<!-- Chart.js 走 CDN，浏览器加载，不占用本机磁盘 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  body{font-family:-apple-system,"Microsoft YaHei",sans-serif;margin:0;background:#0f172a;color:#e2e8f0;}
+  .wrap{max-width:960px;margin:0 auto;padding:24px;}
+  h1{font-size:20px;font-weight:600;margin:0 0 4px;}
+  .sub{color:#64748b;font-size:13px;margin-bottom:16px;}
+  .cards{display:flex;gap:16px;margin:16px 0;}
+  .card{flex:1;background:#1e293b;border-radius:12px;padding:16px;text-align:center;}
+  .card .val{font-size:38px;font-weight:700;}
+  .card .lbl{color:#94a3b8;font-size:13px;margin-top:4px;}
+  .temp .val{color:#f87171;}
+  .humi .val{color:#38bdf8;}
+  .panel{background:#1e293b;border-radius:12px;padding:16px;}
+  .hint{color:#64748b;font-size:12px;margin-top:12px;line-height:1.6;}
+  .stat{color:#94a3b8;font-size:13px;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🌡️ 温湿度实时看板</h1>
+  <div class="sub">STM32 + ESP8266 周期性上传 · 本地服务器实时展示</div>
+  <div class="cards">
+    <div class="card temp"><div class="val" id="tVal">--</div><div class="lbl">温度 (°C)</div></div>
+    <div class="card humi"><div class="val" id="hVal">--</div><div class="lbl">湿度 (%)</div></div>
+  </div>
+  <div class="panel"><canvas id="chart" height="130"></canvas></div>
+  <div class="stat" id="stat">等待数据…</div>
+  <div class="hint">
+    数据每 2 秒自动刷新；未收到数据时曲线为空属正常。<br>
+    服务器：<code>server/app.py</code>（Python 标准库，零依赖）。STM32 每 5 秒 POST 一次。
+  </div>
+</div>
+<script>
+const ctx = document.getElementById('chart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      {label:'温度 °C', data:[], borderColor:'#f87171',
+       backgroundColor:'rgba(248,113,113,.15)', yAxisID:'y', tension:.3, pointRadius:0, borderWidth:2},
+      {label:'湿度 %', data:[], borderColor:'#38bdf8',
+       backgroundColor:'rgba(56,189,248,.15)', yAxisID:'y1', tension:.3, pointRadius:0, borderWidth:2}
+    ]
+  },
+  options: {
+    animation: false,
+    responsive: true,
+    scales: {
+      y:  {position:'left',  title:{display:true,text:'温度 °C',color:'#94a3b8'},
+           suggestedMin:0, suggestedMax:50, ticks:{color:'#94a3b8'}, grid:{color:'#334155'}},
+      y1: {position:'right', title:{display:true,text:'湿度 %',color:'#94a3b8'},
+           suggestedMin:0, suggestedMax:100, ticks:{color:'#94a3b8'}, grid:{drawOnChartArea:false}},
+      x:  {ticks:{color:'#64748b', maxTicksLimit:10}, grid:{color:'#1e293b'}}
+    },
+    plugins: {
+      legend: {labels:{color:'#e2e8f0'}}
+    }
+  }
+});
+
+async function refresh(){
+  try{
+    const r = await fetch('/api/history');
+    const data = await r.json();
+    if(!Array.isArray(data)) return;
+    chart.data.labels = data.map(d => d.ts.slice(11));      // 只显示时分秒
+    chart.data.datasets[0].data = data.map(d => d.t);
+    chart.data.datasets[1].data = data.map(d => d.h);
+    chart.update();
+    if(data.length){
+      const last = data[data.length-1];
+      document.getElementById('tVal').textContent = last.t;
+      document.getElementById('hVal').textContent = last.h;
+      document.getElementById('stat').textContent =
+        `共 ${data.length} 个点 · 最近更新 ${last.ts}`;
+    }
+  }catch(e){ console.warn('refresh failed', e); }
+}
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
