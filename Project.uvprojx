@@ -707,6 +707,16 @@
               <FileType>5</FileType>
               <FilePath>.\User\oled_font.h</FilePath>
             </File>
+            <File>
+              <FileName>max7219.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\User\max7219.c</FilePath>
+            </File>
+            <File>
+              <FileName>max7219.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\User\max7219.h</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

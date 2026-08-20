@@ -1,9 +1,10 @@
-#include "stm32f10x.h"
+﻿#include "stm32f10x.h"
 #include "usart.h"
 #include "delay.h"
 #include "esp8266.h"
 #include "dht11.h"
 #include "oled.h"
+#include "max7219.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -12,7 +13,7 @@
    命令行执行 ipconfig，看“IPv4 地址”（如 192.168.1.x）。
    模块是另一台设备，不能用 localhost / 127.0.0.1。
    服务器在工程目录的 server/ 下，命令行运行：python app.py */
-#define SERVER_IP   "YOUR_LOCAL_IP"   // 改成你电脑的局域网 IP（ipconfig 查看）
+#define SERVER_IP   "YOUR_LOCAL_IP"   // 你电脑的局域网 IP（ipconfig 查看，ESP8266 是另一台设备不能用 localhost）
 #define SERVER_PORT "8000"
 #define SERVER_PATH "/api/data"
 
@@ -52,6 +53,28 @@ int main(void)
 
     USART1_Init(115200);   // 调试输出，接 PC
     USART2_Init(115200);   // 连接 ATK-MW8266D 模块
+
+    /* 点阵先初始化（放在 OLED 前面，排除 OLED 卡住导致点阵没收到指令）
+       ★★★ 接线必须接 DIN（模块输入脚），不是 DOUT（输出脚）！
+       很多模块两边都有引脚：左边 DIN（输入），右边 DOUT（输出/级联用）。
+       接到 DOUT 等于白发数据，芯片一个字也收不到，屏幕一直全亮。 */
+    printf("MAX7219 init...\r\n");
+    MAX7219_Init();        // 初始化：退出掉电、不译码、扫8行、关测试、中等亮度、清屏
+
+    /* 单像素诊断：点亮左上角 1 个 LED，验证 SPI 数据是否到达芯片
+       如果看到：只有左上角 1 个红点亮 → DIN 接对了，驱动正常
+       如果看到：全亮 / 无反应 → DIN 没接对（接了 DOUT）或线松 */
+    printf("[DIAG] lighting 1 pixel at (0,0) for 3s...\r\n");
+    MAX7219_Clear();
+    MAX7219_SetPixel(0, 0, 1);   /* 点亮第 0 行第 0 列（左上角） */
+    Delay_ms(3000);
+    MAX7219_Clear();
+    printf("[DIAG] done. If you saw 1 pixel, DIN is correct.\r\n");
+
+    /* 显示 H 字形 */
+    MAX7219_ShowChar('H');
+    printf("MAX7219 init done\r\n");
+
     DHT11_Init();          // 温湿度传感器（PA0）
     OLED_Init();           // OLED 显示屏（PB8/PB9 软件 I2C，江协科技驱动）
 
@@ -112,15 +135,10 @@ int main(void)
             printf("upload -> %s:%s%s\r\n", SERVER_IP, SERVER_PORT, SERVER_PATH);
             snprintf(body, sizeof(body), "{\"t\":%d,\"h\":%d}", temp, humi);
 
-            /* 上传前确认 WiFi 仍连着；掉线则重连（便于定位“模块无 IP”导致的上传失败） */
-            if (ESP8266_IsConnected() != 0)
-            {
-                printf("[INFO] WiFi lost, reconnecting...\r\n");
-                ESP8266_JoinAP("YOUR_SSID", "YOUR_PASSWORD");
-            }
-
-            /* 上传带一次重试：失败后先关闭可能半开的 socket 再试，
-               规避 ESP8266 在 Connection:close 后偶发的 CIPSEND 卡死 */
+            /* 上传带一次重试：失败后先关半开 socket，第二次重试前重连 WiFi
+               注意：不在主循环里主动发 CWJAP?，因为它会让模块进入 WiFi 状态查询，
+               紧接着的 CIPSTART 会被模块回 "busy p..." 然后 ERROR（昨天能跑通的
+               版本里主循环就没有这个检查） */
             int uploaded = 0;
             for (uint8_t attempt = 1; attempt <= 2 && !uploaded; attempt++)
             {
@@ -135,10 +153,20 @@ int main(void)
                     printf("[ERR] upload failed (try %d)\r\n", attempt);
                     ESP8266_CloseTCP();   // 释放半开连接，避免下次 CIPSEND 卡住
                     Delay_ms(500);
+                    /* 第二次重试前重连 WiFi（万一掉线导致第一次失败） */
+                    if (attempt == 1)
+                    {
+                        printf("[INFO] reconnect WiFi before retry...\r\n");
+                        ESP8266_JoinAP("YOUR_SSID", "YOUR_PASSWORD");
+                        Delay_ms(500);
+                    }
                 }
             }
             if (!uploaded)
                 printf("[WARN] upload gave up this cycle, retry next loop\r\n");
+
+            /* 3) 点阵显示当前温度（8x8 屏一次显 1 字符，交替显示十位/个位） */
+            MAX7219_ShowNum2(temp);
         }
         else
         {
@@ -147,6 +175,6 @@ int main(void)
             OLED_ShowString(1, 1, "DHT11 ERR");
         }
 
-        Delay_ms(5000);   // 每 5 秒采集/上传一次
+        Delay_ms(2000);   // 点阵已显示2秒，这里等2秒，总周期约5秒
     }
 }

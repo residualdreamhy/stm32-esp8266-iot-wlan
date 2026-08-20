@@ -4,6 +4,10 @@
 #include <string.h>
 #include <stdio.h>
 
+/* 缓存模块当前 STA IP，供 ESP8266_IsConnected() 判断 DHCP 是否真正拿到地址；
+   ESP8266_PrintIP() 调用时刷新此值 */
+static char g_sta_ip[20] = "0.0.0.0";
+
 /* 等待期望字符串出现在接收缓冲中，超时返回 ESP8266_TIMEOUT */
 static int WaitForToken(const char* token, uint32_t timeout_ms)
 {
@@ -114,12 +118,18 @@ int ESP8266_ConnectTCP(const char* ip, const char* port)
 
     for (uint8_t try = 0; try < 2; try++)
     {
-        WIFI_RecvFlush();                       // 清掉上次残留回显，避免误匹配
-        if (try > 0)                            // 第二次先关闭可能存在的旧连接再连
+        if (try > 0)                            // 第二次先关旧连接再重连
         {
-            ESP8266_SendCmd("AT+CIPCLOSE\r\n", NULL, 400);
-            WIFI_RecvFlush();
+            /* 等 OK 而非只延时 400ms：CIPCLOSE 要发 TCP FIN 包，模块需要 1~2 秒
+               只延时 400ms 就发 CIPSTART 会让模块回 "busy p..." */
+            ESP8266_SendCmd("AT+CIPCLOSE\r\n", "OK", 2000);
+            Delay_ms(500);                       // 额外等模块状态机归位
         }
+        WIFI_RecvFlush();                       // 清掉上次残留回显，避免误匹配
+        /* 发 CIPSTART 前先发 AT 同步，确保模块不处于 busy 状态
+           （CWJAP? / CIFSR 等指令后模块内部可能还在处理，直接 CIPSTART 会 busy） */
+        ESP8266_SendCmd("AT\r\n", "OK", 1000);
+        WIFI_RecvFlush();
         USART_SendString(WIFI_USART, buf);      // 真正发出 AT+CIPSTART 指令
         /* 接受 OK 或 ALREADY CONNECTED，都视为连接成功 */
         if (WaitForAny("OK", "ALREADY CONNECTED", 8000) == ESP8266_OK)
@@ -134,28 +144,49 @@ int ESP8266_CloseTCP(void)
     return ESP8266_SendCmd("AT+CIPCLOSE\r\n", NULL, 500);
 }
 
-/* 查询当前是否已连上 AP（连上返回 0，未连返回 -1） */
+/* 查询当前是否已连上 WiFi 且 DHCP 拿到地址（双校验：关联 + IP 非 0.0.0.0）
+   返回 0 = 已连可用；返回 -1 = 不可用（关联失败或 IP 未分配） */
 int ESP8266_IsConnected(void)
 {
-    /* AT+CWJAP? 连上 AP 时回 OK 并列出 SSID；未连时回 ERROR */
-    return (ESP8266_SendCmd("AT+CWJAP?\r\n", "OK", 3000) == ESP8266_OK) ? 0 : -1;
+    /* 步骤1：查 WiFi 关联状态（CWJAP? 关联成功回 OK） */
+    if (ESP8266_SendCmd("AT+CWJAP?\r\n", "OK", 3000) != ESP8266_OK)
+        return -1;
+
+    /* 步骤2：检查 IP 缓存是否有效；首次进入或刚重连时主动刷新一次 */
+    if (g_sta_ip[0] == '\0' || strcmp(g_sta_ip, "0.0.0.0") == 0)
+    {
+        ESP8266_PrintIP();   /* 内部会刷新 g_sta_ip */
+        if (g_sta_ip[0] == '\0' || strcmp(g_sta_ip, "0.0.0.0") == 0)
+            return -1;      /* DHCP 还没拿到地址 = 不可用，避免假连接 */
+    }
+    return 0;
 }
 
-/* 打印模块分配到的 IP（便于确认是否真的拿到网络地址） */
+/* 打印模块分配到的 IP，并把 STA IP 缓存到 g_sta_ip（供 IsConnected 判断） */
 void ESP8266_PrintIP(void)
 {
     WIFI_RecvFlush();                                  // 丢弃上次残留
     USART_SendString(WIFI_USART, "AT+CIFSR\r\n");
     /* 在等待期间实时转发模块回显，这样 IP 才会真正显示在调试串口 */
+    char buf[64] = {0};
+    int n = 0;
     uint32_t start = Delay_GetTick();
-    while ((Delay_GetTick() - start) < 1000)
+    while ((Delay_GetTick() - start) < 1000 && n < 63)
     {
         while (WIFI_RecvAvailable() > 0)
         {
             uint8_t ch = WIFI_RecvByte();
             USART_SendData(DEBUG_USART, ch);
             while (USART_GetFlagStatus(DEBUG_USART, USART_FLAG_TXE) == RESET);
+            if (n < 63) buf[n++] = ch;
         }
+    }
+    buf[n] = '\0';
+    /* 解析 +CIFSR:STAIP,"x.x.x.x" 中的 IP，写入全局缓存 */
+    char* p = strstr(buf, "STAIP,\"");
+    if (p)
+    {
+        sscanf(p, "STAIP,\"%19[^\"]\"", g_sta_ip);
     }
 }
 
